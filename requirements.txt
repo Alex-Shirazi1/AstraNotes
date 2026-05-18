@@ -1,0 +1,1 @@
+cryptography==42.0.5   # Fernet symmetric encryption for private notes (SPR-01). License: Apache 2.0
