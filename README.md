@@ -1,55 +1,44 @@
 # AstraNotes
 
-A local-first, single-user note-taking application built for CSEN 296. AstraNotes
-takes a requirement set through the full software development lifecycle —
-requirements, architecture, UML design, traceability, implementation, and
-testing — using AI as a collaborative drafting tool with human validation at
-every step.
+A local-first, multi-user note-taking web application built for CSEN 296B. AstraNotes takes a requirement set through the full AI-assisted software development lifecycle — requirements, architecture, UML design, traceability, implementation, testing, and CI/CD — with human validation at every step.
 
-Notes are stored as individual JSON files on the local machine. There is no
-network dependency and no external service.
+Notes are stored as individual JSON files on the local machine. There is no network dependency and no external service.
 
 ## Features
 
-- **Create notes** with a title, body, and optional comma-separated tags (FR-01, FR-06)
-- **View all notes** sorted by last-modified date, newest first (FR-08)
-- **Search notes** by keyword across title and body, case-insensitive (FR-07)
-- **Delete notes** by ID with a confirmation prompt (FR-03)
-- **Persistence** across sessions — every note is a JSON file under `~/.astranotes/data/` (FR-05)
-- Automatic metadata: UUID, UTC `created_at` / `modified_at` timestamps (FR-06)
-- Clear, non-technical error messages for storage and validation failures (SPR-02)
-
-> **Scope note:** Private-note encryption (FR-04 / SPR-01) and in-CLI editing
-> (FR-02) are designed in the architecture and traceability artifacts but are
-> deferred slices. The `PrivacyService` / `SecureNote` design and the reason for
-> deferral (key-management strategy) are documented in
-> `docs/traceability/` and `docs/architecture/`. `NoteService.edit()` is
-> implemented and unit-tested but is not yet wired into the CLI menu.
+- **Multi-user authentication** — register and log in; passwords hashed with PBKDF2-SHA256 via Werkzeug (FR-08)
+- **Create, edit, duplicate, delete notes** with title, body, and comma-separated tags (FR-01, FR-02, FR-03, FR-06)
+- **Private notes** — toggle a lock flag per note; displayed with a 🔒 icon (FR-04 / SPR-01)
+- **Search** — case-insensitive match across title, body, tags, and note ID prefix (FR-07)
+- **Tag filter** — click any tag chip to filter the note list; clear with ✕
+- **Share notes** — deep-copy a note to another user's account; recipient gets an independent copy tagged `shared-by-{user}`
+- **Live refresh** — page auto-reloads when a new shared note arrives (polls every 5 seconds)
+- **Admin dashboard** — aggregate stats (note count, user count, storage used) and a live audit log of every action
+- **PST/PDT timestamps** — all displayed times converted from UTC
+- **Per-user data isolation** — each user's notes stored in a separate directory under `~/.astranotes/data/{user_id}/`
+- **Persistence** across sessions — every note is a JSON file; no database required (FR-05)
+- **CLI interface** — original terminal menu also available
 
 ## Architecture
 
-AstraNotes uses a layered architecture with strict separation between business
-logic, storage, and presentation (NFR-02). Each layer is one package under
-`src/astranotes/`:
+AstraNotes uses a strict layered architecture (NFR-02). Each layer is one package under `src/astranotes/`:
 
 | Package | Responsibility |
 |---|---|
-| `models` | `Note` dataclass and domain exceptions |
-| `validation` | `ValidationLayer` — input rules (e.g. non-empty title) |
-| `repository` | `NoteRepository` interface + `JsonFileRepository` (JSON-per-note on disk) |
+| `models` | `Note` and `User` dataclasses, domain exceptions |
+| `validation` | `ValidationLayer` — input rules (non-empty title, min length) |
+| `repository` | `NoteRepository` interface + `JsonFileRepository`; `UserRepository` |
 | `service` | `NoteService` — coordinates operations, depends on the repository *interface* |
-| `cli` | Terminal menu shell (entry point) |
-| `privacy` | Reserved for `PrivacyService` (Fernet encryption — deferred slice) |
+| `web` | Flask web UI — routes, Jinja2 templates, session auth |
+| `cli` | Terminal menu shell |
+| `privacy` | Reserved for `PrivacyService` (Fernet encryption — designed, deferred) |
 
-`NoteService` depends on the abstract `NoteRepository`, not the concrete
-`JsonFileRepository`, so the storage backend can be swapped without touching
-business logic.
+`NoteService` depends on the abstract `NoteRepository`, not the concrete `JsonFileRepository`, so the storage backend can be swapped without touching business logic.
 
 ## Requirements
 
 - Python 3.9 or newer
-- Dependencies listed in `requirements.txt` (`cryptography` for the deferred
-  privacy slice)
+- Dependencies in `requirements.txt`
 
 ## Setup
 
@@ -60,44 +49,45 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-To run the test suite you also need pytest:
+## Running the web app
 
 ```bash
-pip install pytest
+flask --app src/astranotes/web/app run --port 5001
 ```
 
-## Usage
+Open `http://localhost:5001` in your browser. An `admin` account (password: `admin`) is created automatically on first launch.
 
-Run the CLI from the `src/` directory:
+To register additional users, click **Register** on the login page.
+
+## Running the CLI
 
 ```bash
 cd src
 python -m astranotes.cli.main
 ```
 
-You will see a menu:
-
-```
-  [1] View all notes
-  [2] Create a note
-  [3] Search notes
-  [4] Delete a note
-  [q] Quit
-```
-
-Notes are written to `~/.astranotes/data/` as `{uuid}.json` and reloaded
-automatically on the next launch.
-
 ## Running the tests
-
-From the project root:
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-All 17 tests should pass. Tests use temporary directories, so they never touch
-the real `~/.astranotes/data/` store (SPR-03).
+All 17 tests should pass. Tests use temporary directories and never touch the real `~/.astranotes/data/` store.
+
+To run with coverage:
+
+```bash
+python -m pytest tests/ -v --cov=src/astranotes --cov-report=term-missing --cov-config=.coveragerc
+```
+
+## CI/CD
+
+GitHub Actions runs on every push to `main` or `feature/**`:
+
+- **Test matrix** — Python 3.9 and 3.11
+- **SAST scan** — Bandit static analysis
+- **Secrets scan** — grep for hardcoded credentials
+- **Coverage gate** — 60% minimum on service/model/repository layers
 
 ## Repository layout
 
@@ -105,35 +95,31 @@ the real `~/.astranotes/data/` store (SPR-03).
 AstraNotes/
 ├── README.md
 ├── requirements.txt
+├── .coveragerc
+├── .github/workflows/ci.yml
 ├── planning/                 # requirements, user stories, backlog, sprint-zero plan
 ├── docs/
-│   ├── requirements/         # initial + refined requirement baselines (PDF)
-│   ├── architecture/         # class, object, package, activity, deployment, use-case diagrams + ADL
+│   ├── requirements/         # initial + refined requirement baselines
+│   ├── architecture/         # UML diagrams + architecture decision log
 │   ├── traceability/         # requirements-to-UML traceability matrix
-│   └── process/              # working agreement, DoD, git workflow, test planning, env setup
+│   └── process/              # working agreement, DoD, git workflow, test planning
 ├── src/astranotes/           # application source (one package per layer)
-└── tests/                    # pytest unit + integration tests
+└── tests/                    # pytest unit tests
 ```
 
 ## SDLC artifacts
 
-This repository contains the complete final project package developed across the
-quarter:
-
-- **Requirements & planning** — `planning/*.md`, `docs/requirements/*.pdf`
-- **Architecture & UML** — `docs/architecture/*.pdf`
-- **Traceability & validation** — `docs/traceability/*.pdf`
+- **Requirements & planning** — `planning/`, `docs/requirements/`
+- **Architecture & UML** — `docs/architecture/`
+- **Traceability** — `docs/traceability/`
 - **Implementation** — `src/astranotes/`
-- **Testing** — `tests/`, `docs/process/Alex_Shirazi_Test_planning.pdf`,
-  `docs/process/Alex_Shirazi_Week9_Test_Improvement_Log.pdf`
-- **Process / security / deployment** — `docs/process/`,
-  `docs/architecture/Deployment Diagram.pdf`,
-  `docs/architecture/AlexShirazi_ArchDecisionLog.pdf`
+- **Testing** — `tests/`, `docs/process/`
+- **CI/CD** — `.github/workflows/ci.yml`
 
 ## AI-assisted development
 
-AI was used as a drafting and cross-checking partner across the SDLC — never as
-a final authority. Each AI suggestion was accepted with modification, changed,
-or rejected with a documented reason. The accept / refine / reject record is in
-the "How AI Helped" section of the traceability matrix
-(`docs/traceability/submission_traceability_matrix_Alex_Shirazi.pdf`).
+AI was used as a drafting and cross-checking partner across the entire SDLC — requirements generation, BDD Gherkin scenarios, architecture documents, UML diagrams, test generation, and the web UI. Every AI output was reviewed and validated. Gaps identified during review (e.g. search not matching tags, share not preserving `is_private`) were caught and fixed by human oversight. The accept/refine/reject record is in `docs/traceability/`.
+
+## Data storage
+
+Notes are stored at `~/.astranotes/data/{user_id}/{note_id}.json`. Users are stored at `~/.astranotes/users/`. Nothing is written inside the project directory.
