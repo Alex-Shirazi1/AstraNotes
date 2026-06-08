@@ -237,7 +237,6 @@
       padding: 20px 22px;
       transition: border-color var(--norm), box-shadow var(--norm);
       cursor: pointer;
-      user-select: none;
     }
 
     .note-card:hover {
@@ -402,7 +401,12 @@
       border-radius: 100px;
       font-size: 0.75rem;
       font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background var(--fast), color var(--fast);
     }
+    .tag:hover { background: var(--accent); color: #fff; }
+    .tag.active { background: var(--accent); color: #fff; }
 
     .meta { font-size: 0.72rem; color: var(--text-dim); font-family: var(--mono); }
     .sep  { color: var(--text-dim); font-size: 0.72rem; }
@@ -632,6 +636,12 @@
       "{{ query }}" — {{ notes|length }} result{% if notes|length != 1 %}s{% endif %}
       <a href="/" aria-label="Clear search" title="Clear search">✕</a>
     </span>
+    {% elif active_tag %}
+    <span class="search-pill">
+      <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      #{{ active_tag }} — {{ notes|length }} note{% if notes|length != 1 %}s{% endif %}
+      <a href="/" aria-label="Clear tag filter" title="Clear tag filter">✕</a>
+    </span>
     {% else %}
     <span class="list-label">{{ notes|length }} note{% if notes|length != 1 %}s{% endif %}</span>
     {% endif %}
@@ -655,7 +665,6 @@
             onclick="event.stopPropagation(); toggleEdit('{{ note.id }}')"
             aria-expanded="false"
             id="edit-btn-{{ note.id }}"
-            disabled
           >
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Edit
@@ -664,7 +673,6 @@
             class="btn-action btn-action-delete"
             type="button"
             onclick="event.stopPropagation(); showDel('{{ note.id }}')"
-            disabled
           >
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
             Delete
@@ -673,7 +681,6 @@
             <button
               type="submit"
               class="btn-action btn-action-dup"
-              disabled
               id="dup-btn-{{ note.id }}"
               title="Duplicate note"
             >
@@ -722,6 +729,16 @@
                 rows="5"
               >{{ note.body }}</textarea>
             </div>
+            <div class="fg" style="flex-direction:row;align-items:center;gap:8px;">
+              <input
+                type="checkbox"
+                id="ep-{{ note.id }}"
+                name="is_private"
+                {% if note.is_private %}checked{% endif %}
+                style="accent-color:var(--accent);width:15px;height:15px;cursor:pointer;"
+              >
+              <label for="ep-{{ note.id }}" class="flabel" style="margin:0;cursor:pointer;">🔒 Private note</label>
+            </div>
             <div class="form-actions">
               <button type="button" class="btn btn-ghost" onclick="toggleEdit('{{ note.id }}')">Cancel</button>
               <button type="submit" class="btn btn-primary">Save</button>
@@ -733,11 +750,11 @@
       <!-- Card footer: FR-06 metadata ─── -->
       <footer class="card-footer">
         {% for tag in note.tags %}
-        <span class="tag">#{{ tag }}</span>
+        <a href="/?tag={{ tag }}" class="tag {% if active_tag == tag %}active{% endif %}" onclick="event.stopPropagation()">#{{ tag }}</a>
         {% endfor %}
-        <span class="meta">Modified {{ note.modified_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+        <span class="meta">Modified {{ note.modified_at|pst }}</span>
         <span class="sep">·</span>
-        <span class="meta">Created {{ note.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</span>
+        <span class="meta">Created {{ note.created_at|pst }}</span>
         <span class="sep">·</span>
         <span class="meta" title="Note ID: {{ note.id }}">{{ note.id }}</span>
       </footer>
@@ -898,23 +915,14 @@
 
   /* ── Note card selection (enables action buttons) ───────────── */
   function selectCard(noteId) {
-    // Deselect all cards and disable their buttons
+    // Deselect all cards
     document.querySelectorAll('.note-card').forEach(function(card) {
       card.classList.remove('selected');
-      card.querySelectorAll('.btn-action').forEach(function(btn) {
-        btn.disabled = true;
-      });
     });
-    // Select clicked card and enable its buttons
+    // Highlight clicked card
     const card = document.getElementById('card-' + noteId);
     if (!card) return;
     card.classList.add('selected');
-    card.querySelectorAll('.btn-action').forEach(function(btn) {
-      btn.disabled = false;
-    });
-    // Update hint text
-    const hint = document.getElementById('select-hint');
-    if (hint) hint.textContent = 'Note selected — Edit, Duplicate, or Delete are now active.';
   }
 
   /* ── Flash auto-dismiss after 5 seconds ─────────────────────── */

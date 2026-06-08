@@ -101,6 +101,9 @@ class NoteService:
         kw = keyword.strip().lower()
         matched = [
             n for n in self._repo.list_all()
-            if kw in n.title.lower() or kw in n.body.lower()
+            if kw in n.title.lower()
+            or kw in n.body.lower()
+            or any(kw in tag.lower() for tag in n.tags)
+            or n.id.lower().startswith(kw)
         ]
         return SearchResult(keyword=keyword.strip(), notes=matched)

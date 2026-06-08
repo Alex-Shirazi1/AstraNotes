@@ -11,6 +11,11 @@ env/
 
 # macOS
 .DS_Store
+**/.DS_Store
+
+# Coverage
+.coverage
+.coverage.*
 
 # Local app data (notes are user data, not source)
 .astranotes/

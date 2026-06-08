@@ -13,7 +13,9 @@ Each user gets an isolated notes directory:
   ~/.astranotes/data/{user_id}/
 """
 import logging
+import os
 import sys
+from datetime import timezone, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -49,11 +51,59 @@ logging.basicConfig(
 )
 logger = logging.getLogger("astranotes.web")
 
+# ── Template filters ───────────────────────────────────────────────
+_PST = timezone(timedelta(hours=-8))
+_PDT = timezone(timedelta(hours=-7))
+
+def _to_pst(dt):
+    """Convert a UTC datetime to PST/PDT string for display."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    month = dt.month
+    tz = _PDT if 3 < month < 11 else _PST
+    label = "PDT" if tz is _PDT else "PST"
+    local = dt.astimezone(tz)
+    return local.strftime(f"%Y-%m-%d %H:%M {label}")
+
 # ── Flask app ──────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = "astranotes-dev-secret-change-in-prod"
+app.jinja_env.filters["pst"] = _to_pst
 
 user_repo = UserRepository(USERS_DIR)
+
+
+# ── Seed admin singleton ───────────────────────────────────────────
+def _seed_admin() -> None:
+    """Ensure exactly one admin account exists on every startup.
+
+    Credentials come from env vars so nothing sensitive lives in source.
+    If the account already exists it is left untouched (true singleton).
+
+    Defaults (fine for demo / local dev):
+        username: admin
+        password: admin
+
+    Override for a real deployment:
+        ASTRANOTES_ADMIN_USER=alex ASTRANOTES_ADMIN_PASS=s3cure flask run
+    """
+    admin_user = os.environ.get("ASTRANOTES_ADMIN_USER", "admin")
+    admin_pass = os.environ.get("ASTRANOTES_ADMIN_PASS", "admin")
+    if not user_repo.username_exists(admin_user):
+        user = User(
+            username=admin_user,
+            password_hash=generate_password_hash(admin_pass, method="pbkdf2:sha256"),
+            role="admin",
+        )
+        user_repo.save(user)
+        logger.info("SEED_ADMIN created singleton admin user=%r", admin_user)
+    else:
+        logger.debug("SEED_ADMIN admin user=%r already exists, skipping", admin_user)
+
+
+_seed_admin()
 
 
 # ── Helpers ────────────────────────────────────────────────────────
@@ -75,6 +125,8 @@ def login_required(f):
     return decorated
 
 
+
+
 # ── Auth routes ────────────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
@@ -89,7 +141,8 @@ def login():
             session.clear()
             session["user_id"]   = user.id
             session["username"]  = user.username
-            logger.info("LOGIN user=%r", username)
+            session["role"]      = user.role
+            logger.info("LOGIN user=%r role=%s", username, user.role)
             flash(f"Welcome back, {user.username}!", "success")
             return redirect(url_for("index"))
         logger.warning("LOGIN_FAILED user=%r", username)
@@ -116,13 +169,14 @@ def register():
         else:
             user = User(
                 username=username,
-                password_hash=generate_password_hash(password),
+                password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
             )
             user_repo.save(user)
             session.clear()
             session["user_id"]  = user.id
             session["username"] = user.username
-            logger.info("REGISTER user=%r id=%s", username, user.id)
+            session["role"]     = user.role
+            logger.info("REGISTER user=%r id=%s role=%s", username, user.id, user.role)
             flash(f"Account created. Welcome, {username}!", "success")
             return redirect(url_for("index"))
     return render_template("register.html")
@@ -144,7 +198,8 @@ def logout():
 @login_required
 def index():
     service, _ = _note_service()
-    q = request.args.get("q", "").strip()
+    q          = request.args.get("q", "").strip()
+    active_tag = request.args.get("tag", "").strip()
     if q:
         try:
             result = service.search(q)
@@ -156,10 +211,16 @@ def index():
             logger.warning("SEARCH_REJECTED user=%r keyword=%r reason=%s",
                            session["username"], q, exc)
             notes = service.list_sorted()
+    elif active_tag:
+        all_notes = service.list_sorted()
+        notes = [n for n in all_notes if active_tag.lower() in [t.lower() for t in n.tags]]
+        logger.info("TAG_FILTER user=%r tag=%r hits=%d",
+                    session["username"], active_tag, len(notes))
     else:
         notes = service.list_sorted()
         logger.info("VIEW_LIST user=%r count=%d", session["username"], len(notes))
     return render_template("index.html", notes=notes, query=q,
+                           active_tag=active_tag,
                            username=session["username"])
 
 
@@ -190,12 +251,18 @@ def create_note():
 @app.route("/notes/<note_id>/edit", methods=["POST"])
 @login_required
 def edit_note(note_id: str):
-    service, _ = _note_service()
-    title = request.form.get("title", "").strip()
-    body  = request.form.get("body", "").strip()
+    service, repo = _note_service()
+    title      = request.form.get("title", "").strip()
+    body       = request.form.get("body", "").strip()
+    is_private = request.form.get("is_private") == "on"
     try:
         service.edit(note_id, title, body)
-        logger.info("EDIT user=%r id=%s title=%r", session["username"], note_id, title)
+        # update is_private separately (not part of NoteService.edit signature)
+        note = repo.get(note_id)
+        note.is_private = is_private
+        repo.update(note)
+        logger.info("EDIT user=%r id=%s title=%r private=%s",
+                    session["username"], note_id, title, is_private)
         flash("Note updated.", "success")
     except ValidationError as exc:
         flash(f"Validation error: {exc.message}", "error")
