@@ -297,6 +297,27 @@
 
     .btn-action-dup { color: var(--text-muted); }
     .btn-action-dup:hover { background: rgba(192,132,252,.1); color: #c084fc; border-color: rgba(192,132,252,.25); }
+    .btn-action-share { color: var(--text-muted); }
+    .btn-action-share:hover { background: rgba(77,184,138,.1); color: var(--success); border-color: rgba(77,184,138,.25); }
+    .share-wrapper { position: relative; display: inline-flex; }
+    .share-user-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 7px 9px; background: transparent;
+      border: 1px solid transparent; border-radius: var(--r-sm);
+      color: var(--text-muted); font: inherit; font-size: .875rem;
+      cursor: pointer; text-align: left;
+      transition: background var(--fast), border-color var(--fast), color var(--fast);
+    }
+    .share-user-btn:hover { background: var(--accent-dim); color: var(--text); }
+    .share-user-btn[data-selected="true"] { background: var(--accent-dim); color: var(--text); border-color: rgba(105,124,245,.3); }
+    .share-popup {
+      display: none; position: absolute; top: calc(100% + 8px); right: 0; z-index: 100;
+      background: var(--surface-2, #1e2235); border: 1px solid var(--border-2);
+      border-radius: var(--r-md); padding: 14px; min-width: 200px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      animation: pop-in 120ms cubic-bezier(.16,1,.3,1) both;
+    }
+    .share-popup.open { display: block; }
 
     .btn-action:disabled {
       opacity: 0.28;
@@ -610,7 +631,6 @@
 
 <!-- ── Flash messages ───────────────────────────────────────────── -->
 {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
   <div class="flash-zone" role="status" aria-live="polite">
     {% for category, message in messages %}
     <div class="flash flash-{{ category }}">
@@ -623,7 +643,6 @@
     </div>
     {% endfor %}
   </div>
-  {% endif %}
 {% endwith %}
 
 <!-- ── Main ─────────────────────────────────────────────────────── -->
@@ -688,11 +707,50 @@
               Duplicate
             </button>
           </form>
+          {% if other_users %}
+          <div class="share-wrapper" onclick="event.stopPropagation()">
+            <button
+              class="btn-action btn-action-share"
+              type="button"
+              onclick="event.stopPropagation(); toggleShare('{{ note.id }}')"
+              title="Share note"
+            >
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              Share
+            </button>
+            <div class="share-popup" id="sp-{{ note.id }}" onclick="event.stopPropagation()">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <p style="font-size:.8125rem;font-weight:600;color:var(--text);margin:0;">Share with</p>
+                <button type="button" onclick="toggleShare('{{ note.id }}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.9rem;padding:2px 4px;line-height:1;" title="Close">✕</button>
+              </div>
+              <form method="post" action="/notes/{{ note.id }}/share" id="sf-{{ note.id }}">
+                <input type="hidden" name="target_username" id="su-{{ note.id }}" value="{{ other_users[0] }}">
+                <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;">
+                  {% for u in other_users %}
+                  <button type="button"
+                    class="share-user-btn"
+                    id="sub-{{ note.id }}-{{ u }}"
+                    onclick="selectShareUser('{{ note.id }}', '{{ u }}')"
+                    {% if loop.first %}data-selected="true"{% endif %}
+                  >
+                    <span style="width:22px;height:22px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;">{{ u[0]|upper }}</span>
+                    {{ u }}
+                  </button>
+                  {% endfor %}
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;padding:8px;font-size:.875rem;">
+                  <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  Send copy
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
       {% if note.body %}
-      <p class="note-body">{{ note.body[:200] }}{% if note.body|length > 200 %}…{% endif %}</p>
+      <p class="note-body">{{ note.body[:350] }}{% if note.body|length > 350 %}…{% endif %}</p>
       {% endif %}
 
       <!-- Delete confirmation strip — FR-03 -->
@@ -882,6 +940,30 @@
   });
 
   /* ── Inline edit toggle — FR-02 ─────────────────────────────── */
+  function selectShareUser(noteId, username) {
+    // update hidden input
+    document.getElementById('su-' + noteId).value = username;
+    // update selected state on buttons
+    document.querySelectorAll('[id^="sub-' + noteId + '-"]').forEach(function(btn) {
+      btn.dataset.selected = (btn.id === 'sub-' + noteId + '-' + username) ? 'true' : 'false';
+    });
+  }
+
+  function toggleShare(id) {
+    // close all other share popups first
+    document.querySelectorAll('.share-popup.open').forEach(function(p) {
+      if (p.id !== 'sp-' + id) p.classList.remove('open');
+    });
+    const popup = document.getElementById('sp-' + id);
+    if (popup) popup.classList.toggle('open');
+  }
+  // clicking anywhere outside closes share popups
+  document.addEventListener('click', function() {
+    document.querySelectorAll('.share-popup.open').forEach(function(p) {
+      p.classList.remove('open');
+    });
+  });
+
   function toggleEdit(id) {
     const form = document.getElementById('ef-' + id);
     const btn  = document.getElementById('edit-btn-' + id);
@@ -932,6 +1014,37 @@
       el.addEventListener('transitionend', function() { el.remove(); }, { once: true });
     }, 5000);
   });
+
+  /* ── Live note-count polling (shared note notification) ──────── */
+  (function() {
+    var knownCount = {{ notes|length }};
+    var notified = false;
+
+    function showFlash(msg, category) {
+      var container = document.querySelector('.flash-zone');
+      if (!container) return;
+      var el = document.createElement('div');
+      el.className = 'flash flash-' + category;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(function() {
+        el.classList.add('dismissing');
+        el.addEventListener('transitionend', function() { el.remove(); notified = false; }, { once: true });
+      }, 5000);
+    }
+
+    setInterval(function() {
+      if (notified) return;
+      fetch('/api/note-count')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.count > knownCount) {
+            window.location.reload();
+          }
+        })
+        .catch(function() {});
+    }, 5000);
+  })();
 </script>
 </body>
 </html>

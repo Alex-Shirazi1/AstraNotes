@@ -219,9 +219,12 @@ def index():
     else:
         notes = service.list_sorted()
         logger.info("VIEW_LIST user=%r count=%d", session["username"], len(notes))
+    other_users = [u.username for u in user_repo.list_all()
+                   if u.username != session["username"]]
     return render_template("index.html", notes=notes, query=q,
                            active_tag=active_tag,
-                           username=session["username"])
+                           username=session["username"],
+                           other_users=other_users)
 
 
 @app.route("/notes", methods=["POST"])
@@ -310,6 +313,52 @@ def duplicate_note(note_id: str):
     except StoragePersistenceError as exc:
         flash(f"Storage error: {exc.message}", "error")
     return redirect(url_for("index"))
+
+
+@app.route("/notes/<note_id>/share", methods=["POST"])
+@login_required
+def share_note(note_id: str):
+    _, repo = _note_service()
+    target_username = request.form.get("target_username", "").strip()
+    if not target_username:
+        flash("Please select a user to share with.", "error")
+        return redirect(url_for("index"))
+    if target_username == session["username"]:
+        flash("You can't share a note with yourself.", "error")
+        return redirect(url_for("index"))
+    target_user = user_repo.get_by_username(target_username)
+    if not target_user:
+        flash(f"User '{target_username}' not found.", "error")
+        return redirect(url_for("index"))
+    try:
+        original = repo.get(note_id)
+        shared_tag = f"shared-by-{session['username']}"
+        copy = Note(
+            title=original.title,
+            body=original.body,
+            tags=list(original.tags) + [shared_tag],
+            is_private=original.is_private,
+        )
+        target_repo = JsonFileRepository(DATA_ROOT / target_user.id)
+        ValidationLayer().validate_note(copy)
+        target_repo.save(copy)
+        logger.info("SHARE user=%r -> target=%r note_id=%s",
+                    session["username"], target_username, note_id)
+        flash(f'Note shared with {target_username}.', "success")
+    except NoteNotFoundError:
+        flash("Note not found.", "error")
+    except StoragePersistenceError as exc:
+        flash(f"Storage error: {exc.message}", "error")
+    return redirect(url_for("index"))
+
+
+# ── Live poll endpoint ─────────────────────────────────────────────
+@app.route("/api/note-count")
+@login_required
+def note_count():
+    from flask import jsonify
+    _, repo = _note_service()
+    return jsonify({"count": len(repo.list_all())})
 
 
 # ── Admin dashboard ────────────────────────────────────────────────
