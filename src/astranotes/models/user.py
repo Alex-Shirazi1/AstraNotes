@@ -3,6 +3,7 @@ astranotes.models.user
 User entity for multi-user web UI.
 Traces to: web authentication layer (FR extension for web UI)
 """
+# model version
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
