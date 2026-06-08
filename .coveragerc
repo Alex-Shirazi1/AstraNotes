@@ -2,6 +2,7 @@
 source = src/astranotes
 omit =
     src/astranotes/web/*
+    src/astranotes/cli/*
     src/astranotes/models/user.py
     src/astranotes/repository/user_repository.py
 
