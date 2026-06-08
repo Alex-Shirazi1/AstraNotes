@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — AstraNotes</title>
+  <style>
+    :root {
+      --bg: #0d0f18; --surface: #161926; --border: #252840; --border-2: #2e3255;
+      --accent: #697cf5; --accent-dim: rgba(105,124,245,.14);
+      --text: #e2e4f0; --text-muted: #6e7394;
+      --success: #4db88a; --danger: #f06060;
+      --r-md: 10px; --r-xl: 18px;
+      --fast: 110ms; --norm: 200ms; --ease: cubic-bezier(.16,1,.3,1);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border-2);
+      border-radius: var(--r-xl); width: 100%; max-width: 400px; padding: 36px 32px;
+      animation: pop-in var(--norm) var(--ease) both;
+    }
+    @keyframes pop-in { from { opacity:0; transform:translateY(12px) scale(.97); } to { opacity:1; transform:none; } }
+    .logo { display:flex; align-items:center; gap:9px; margin-bottom:28px; }
+    .logo-mark { width:32px; height:32px; border-radius:8px;
+      background:linear-gradient(135deg,#697cf5 0%,#9b6cf5 100%);
+      display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+    .logo-name { font-size:1.125rem; font-weight:700; letter-spacing:-.02em; }
+    h1 { font-size:1.25rem; font-weight:700; letter-spacing:-.02em; margin-bottom:6px; }
+    .sub { font-size:.875rem; color:var(--text-muted); margin-bottom:24px; }
+    .fg { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+    label { font-size:.8125rem; font-weight:500; color:var(--text-muted); }
+    input {
+      background:var(--bg); border:1px solid var(--border); border-radius:var(--r-md);
+      color:var(--text); font:inherit; font-size:.9375rem; padding:10px 13px; outline:none; width:100%;
+      transition:border-color var(--fast), box-shadow var(--fast);
+    }
+    input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-dim); }
+    .btn {
+      width:100%; padding:11px; background:var(--accent); color:#fff; border:none;
+      border-radius:var(--r-md); font:inherit; font-size:.9375rem; font-weight:600;
+      cursor:pointer; margin-top:6px; transition:opacity var(--fast);
+    }
+    .btn:hover { opacity:.86; }
+    .flash { padding:10px 14px; border-radius:var(--r-md); font-size:.875rem; margin-bottom:16px; }
+    .flash-error { background:rgba(240,96,96,.1); border:1px solid rgba(240,96,96,.28); color:var(--danger); }
+    .flash-success { background:rgba(77,184,138,.1); border:1px solid rgba(77,184,138,.28); color:var(--success); }
+    .foot { text-align:center; font-size:.8125rem; color:var(--text-muted); margin-top:20px; }
+    .foot a { color:var(--accent); text-decoration:none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <span class="logo-mark">✦</span>
+      <span class="logo-name">AstraNotes</span>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <h1>Create account</h1>
+    <p class="sub">Your notes are stored locally and isolated to your account.</p>
+
+    <form method="post" action="/register">
+      <div class="fg">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username"
+               placeholder="choose a username" required autofocus minlength="2">
+      </div>
+      <div class="fg">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password"
+               placeholder="at least 4 characters" required minlength="4">
+      </div>
+      <div class="fg">
+        <label for="confirm">Confirm password</label>
+        <input type="password" id="confirm" name="confirm" autocomplete="new-password"
+               placeholder="repeat password" required>
+      </div>
+      <button type="submit" class="btn">Create account</button>
+    </form>
+
+    <p class="foot">Already have an account? <a href="/login">Sign in</a></p>
+  </div>
+</body>
+</html>

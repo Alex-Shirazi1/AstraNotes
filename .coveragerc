@@ -1,0 +1,10 @@
+[run]
+source = src/astranotes
+omit =
+    src/astranotes/web/*
+    src/astranotes/models/user.py
+    src/astranotes/repository/user_repository.py
+
+[report]
+fail_under = 70
+show_missing = true
