@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="30">
+  <title>AstraNotes — Admin</title>
+  <style>
+    :root {
+      --bg:         #0d0f18;
+      --surface:    #161926;
+      --surface-2:  #1e2235;
+      --border:     #252840;
+      --border-2:   #2e3255;
+      --accent:     #697cf5;
+      --accent-dim: rgba(105,124,245,.14);
+      --text:       #e2e4f0;
+      --text-muted: #6e7394;
+      --text-dim:   #3d4162;
+      --success:    #4db88a;
+      --danger:     #f06060;
+      --warn:       #f0c060;
+
+      --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --mono: "SF Mono", "Cascadia Code", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,15,24,.9);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      max-width: 960px; margin: 0 auto; padding: 0 28px;
+      height: 60px; display: flex; align-items: center; gap: 16px;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 1rem; font-weight: 700; letter-spacing: -.02em;
+      color: var(--text); text-decoration: none;
+    }
+
+    .logo-mark {
+      width: 28px; height: 28px; border-radius: var(--r-sm);
+      background: linear-gradient(135deg,#697cf5 0%,#9b6cf5 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .875rem; flex-shrink: 0;
+    }
+
+    .badge {
+      padding: 3px 9px; border-radius: 100px;
+      font-size: .75rem; font-weight: 600;
+      background: rgba(105,124,245,.18); color: var(--accent);
+      border: 1px solid rgba(105,124,245,.25);
+    }
+
+    .header-spacer { flex: 1; }
+
+    .btn-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--r-md);
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text-muted); font: inherit; font-size: .8125rem;
+      font-weight: 500; cursor: pointer; text-decoration: none;
+      transition: background 110ms, color 110ms;
+    }
+    .btn-back:hover { background: var(--surface-2,#1e2235); color: var(--text); }
+
+    /* ── Main ───────────────────────────────────────────────────── */
+    .main { max-width: 960px; margin: 0 auto; padding: 32px 28px 64px; }
+
+    .page-title {
+      font-size: 1.375rem; font-weight: 700; letter-spacing: -.02em;
+      margin-bottom: 6px;
+    }
+
+    .page-sub {
+      font-size: .875rem; color: var(--text-muted); margin-bottom: 32px;
+    }
+
+    .refresh-note {
+      font-size: .75rem; color: var(--text-dim); font-family: var(--mono);
+    }
+
+    /* ── Grid layout ────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+
+    @media (max-width: 680px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-4 { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-xl); padding: 20px 22px;
+    }
+
+    .card-title {
+      font-size: .75rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .08em; color: var(--text-muted); margin-bottom: 14px;
+    }
+
+    /* ── Status indicators ──────────────────────────────────────── */
+    .status-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .status-row:last-child { border-bottom: none; }
+
+    .status-label { font-size: .875rem; color: var(--text-muted); }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 100px;
+      font-size: .75rem; font-weight: 600;
+    }
+
+    .status-pill.up {
+      background: rgba(77,184,138,.12);
+      border: 1px solid rgba(77,184,138,.28);
+      color: var(--success);
+    }
+
+    .status-pill.down {
+      background: rgba(240,96,96,.12);
+      border: 1px solid rgba(240,96,96,.28);
+      color: var(--danger);
+    }
+
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+    }
+
+    .status-path {
+      font-size: .75rem; color: var(--text-dim);
+      font-family: var(--mono); margin-top: 6px;
+    }
+
+    /* ── Stat tiles ─────────────────────────────────────────────── */
+    .stat-tile {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-xl); padding: 20px 22px;
+    }
+
+    .stat-value {
+      font-size: 2rem; font-weight: 700; letter-spacing: -.03em;
+      color: var(--text); line-height: 1; margin-bottom: 6px;
+    }
+
+    .stat-label { font-size: .8125rem; color: var(--text-muted); }
+
+    /* ── Log viewer ─────────────────────────────────────────────── */
+    .log-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 20px 22px; }
+
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .log-list {
+      list-style: none;
+      max-height: 380px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .log-list::-webkit-scrollbar { width: 5px; }
+    .log-list::-webkit-scrollbar-track { background: transparent; }
+    .log-list::-webkit-scrollbar-thumb { background: var(--border-2,#2e3255); border-radius: 10px; }
+
+    .log-entry {
+      font-family: var(--mono); font-size: .75rem;
+      padding: 6px 10px; border-radius: var(--r-sm);
+      background: var(--surface-2,#1e2235);
+      color: var(--text-muted);
+      word-break: break-all;
+    }
+
+    .log-entry.create   { border-left: 2px solid var(--success); }
+    .log-entry.delete   { border-left: 2px solid var(--danger); }
+    .log-entry.edit     { border-left: 2px solid var(--accent); }
+    .log-entry.search   { border-left: 2px solid var(--warn); }
+    .log-entry.dup      { border-left: 2px solid #c084fc; }
+    .log-entry.view     { border-left: 2px solid var(--border-2,#2e3255); }
+
+    .log-empty {
+      font-size: .875rem; color: var(--text-dim);
+      text-align: center; padding: 24px 0;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header" role="banner">
+  <div class="header-inner">
+    <a href="/" class="logo" aria-label="AstraNotes home">
+      <span class="logo-mark" aria-hidden="true">✦</span>
+      AstraNotes
+    </a>
+    <span class="badge">Admin</span>
+    <div class="header-spacer"></div>
+    <a href="/" class="btn-back">
+      <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back to Notes
+    </a>
+  </div>
+</header>
+
+<main class="main">
+  <h1 class="page-title">Operational Dashboard</h1>
+  <p class="page-sub">
+    System health and database statistics for AstraNotes.
+    <span class="refresh-note">Auto-refreshes every 30 s.</span>
+  </p>
+
+  <!-- ── System Health ──────────────────────────────────────────── -->
+  <div class="grid-2">
+    <div class="card">
+      <p class="card-title">System Health</p>
+
+      <div class="status-row">
+        <span class="status-label">Application</span>
+        <span class="status-pill up">
+          <span class="status-dot" style="background:var(--success)"></span>Running
+        </span>
+      </div>
+
+      <div class="status-row">
+        <span class="status-label">Storage</span>
+        {% if storage_ok %}
+        <span class="status-pill up">
+          <span class="status-dot" style="background:var(--success)"></span>Accessible
+        </span>
+        {% else %}
+        <span class="status-pill down">
+          <span class="status-dot" style="background:var(--danger)"></span>Unavailable
+        </span>
+        {% endif %}
+      </div>
+
+      <div class="status-row">
+        <span class="status-label">Users</span>
+        <span class="status-pill up">
+          <span class="status-dot" style="background:var(--success)"></span>1 (local)
+        </span>
+      </div>
+
+      <p class="status-path">{{ storage_path }}</p>
+    </div>
+
+    <div class="card">
+      <p class="card-title">API Endpoints</p>
+
+      <div class="status-row">
+        <span class="status-label">GET /</span>
+        <span class="status-pill up"><span class="status-dot" style="background:var(--success)"></span>200 OK</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">POST /notes</span>
+        <span class="status-pill up"><span class="status-dot" style="background:var(--success)"></span>Active</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">POST /notes/&lt;id&gt;/edit</span>
+        <span class="status-pill up"><span class="status-dot" style="background:var(--success)"></span>Active</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">POST /notes/&lt;id&gt;/delete</span>
+        <span class="status-pill up"><span class="status-dot" style="background:var(--success)"></span>Active</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Database Stats ─────────────────────────────────────────── -->
+  <div class="grid-4">
+    <div class="stat-tile">
+      <p class="stat-value">{{ total_notes }}</p>
+      <p class="stat-label">Total Notes</p>
+    </div>
+    <div class="stat-tile">
+      <p class="stat-value">1</p>
+      <p class="stat-label">Total Users</p>
+    </div>
+    <div class="stat-tile">
+      <p class="stat-value">{{ storage_kb }} <span style="font-size:1rem;font-weight:400;color:var(--text-muted)">KB</span></p>
+      <p class="stat-label">Storage Used</p>
+    </div>
+    <div class="stat-tile">
+      <p class="stat-value">{{ avg_body }} <span style="font-size:1rem;font-weight:400;color:var(--text-muted)">ch</span></p>
+      <p class="stat-label">Avg Content Length</p>
+    </div>
+  </div>
+
+  <!-- ── Action Log ─────────────────────────────────────────────── -->
+  <div class="log-card">
+    <div class="log-header">
+      <p class="card-title" style="margin:0">Recent Action Log</p>
+      <span style="font-size:.75rem;color:var(--text-dim);font-family:var(--mono)">last 25 entries · newest first</span>
+    </div>
+
+    {% if recent_logs %}
+    <ul class="log-list" aria-label="Recent application actions">
+      {% for line in recent_logs %}
+      {% set cls = "view" %}
+      {% if "CREATE" in line and "REJECTED" not in line %}{% set cls = "create" %}{% endif %}
+      {% if "DELETE" in line and "NOT_FOUND" not in line %}{% set cls = "delete" %}{% endif %}
+      {% if "EDIT" in line and "REJECTED" not in line and "NOT_FOUND" not in line %}{% set cls = "edit" %}{% endif %}
+      {% if "SEARCH" in line %}{% set cls = "search" %}{% endif %}
+      {% if "DUPLICATE" in line %}{% set cls = "dup" %}{% endif %}
+      <li class="log-entry {{ cls }}">{{ line }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="log-empty">No actions logged yet. Interact with the app to see entries here.</p>
+    {% endif %}
+  </div>
+</main>
+
+</body>
+</html>

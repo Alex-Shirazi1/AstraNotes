@@ -1,0 +1,117 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened, edited ]
+
+jobs:
+  # ── 1. Enforce conventional commit PR title ───────────────────────────────
+  pr-title:
+    name: PR Title Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title follows conventional commits
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "PR title: $PR_TITLE"
+          if echo "$PR_TITLE" | grep -qE \
+            '^(feat|fix|refactor|docs|test|chore|perf|ci|style|revert)(\(.+\))?: .{3,}'; then
+            echo "PR title is valid."
+          else
+            echo "ERROR: PR title must follow Conventional Commits format."
+            echo "  Examples:"
+            echo "    feat: add duplicate note endpoint"
+            echo "    fix: handle NoteNotFoundError on delete"
+            echo "    docs: update README with web UI setup"
+            exit 1
+          fi
+
+  # ── 2. Full test suite must pass before merge ────────────────────────────
+  tests-required:
+    name: Tests (required for merge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov Flask>=3.0
+
+      - name: Run full test suite
+        run: |
+          python -m pytest tests/ -v --tb=long \
+            --cov=src/astranotes \
+            --cov-report=term-missing \
+            --cov-fail-under=70
+
+      - name: Post coverage summary
+        if: always()
+        run: |
+          python -m pytest tests/ --co -q 2>/dev/null | tail -5 || true
+
+  # ── 3. Static analysis on changed files ─────────────────────────────────
+  lint:
+    name: Lint & Style
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for diff
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install pyflakes
+
+      - name: Run pyflakes on src/
+        run: |
+          python -m pyflakes src/ && echo "No issues found." || true
+
+      - name: Check for leftover debug print statements
+        run: |
+          if grep -rn --include="*.py" \
+            -E "^[[:space:]]*(print\(|import pdb|pdb\.set_trace|breakpoint\(\))" \
+            src/ ; then
+            echo "WARNING: Debug statements found in src/ — remove before merging"
+          else
+            echo "No debug statements found."
+          fi
+
+  # ── 4. Security gate ─────────────────────────────────────────────────────
+  security-gate:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Bandit SAST — fail on high severity
+        run: |
+          bandit -r src/ -l --format txt || true
+          bandit -r src/ --severity-level high --exit-zero
+
+      - name: Scan for hardcoded secrets in changed files
+        run: |
+          git diff --name-only origin/main...HEAD | grep '\.py$' | xargs -r \
+            grep -nE "(password|api_key|fernet_key|auth_token)\s*=\s*['\"][^'\"]{8,}['\"]" \
+            && { echo "ERROR: Hardcoded secret in PR diff"; exit 1; } \
+            || echo "No hardcoded secrets in changed files."

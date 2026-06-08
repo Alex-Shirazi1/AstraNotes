@@ -74,12 +74,16 @@ def search_notes(service: NoteService):
     if not keyword:
         print("  Please enter a keyword.")
         return
-    results = service.search(keyword)
-    if not results:
-        print(f"\n  No notes matched '{keyword}'.")
+    try:
+        result = service.search(keyword)
+    except ValueError as e:
+        print(f"\n  {e}")
+        return
+    if result.count == 0:
+        print(f"\n  No notes matched '{result.keyword}'.")
     else:
-        print(f"\n  {len(results)} result(s) for '{keyword}':\n")
-        for note in results:
+        print(f"\n  {result.count} result(s) for '{result.keyword}':\n")
+        for note in result.notes:
             print(f"  - {note.title} (ID: {note.id})")
 
 

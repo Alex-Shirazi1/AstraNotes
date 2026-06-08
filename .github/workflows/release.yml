@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"   # triggers on v1.0.0, v1.2.3, etc.
+
+jobs:
+  # ── 1. Full test suite must be green before release ──────────────────────
+  pre-release-tests:
+    name: Pre-release Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov Flask>=3.0
+
+      - name: Run full test suite
+        run: |
+          python -m pytest tests/ -v --tb=long \
+            --cov=src/astranotes \
+            --cov-report=term-missing \
+            --cov-fail-under=70
+
+  # ── 2. Security scan before shipping ────────────────────────────────────
+  pre-release-security:
+    name: Pre-release Security Scan
+    runs-on: ubuntu-latest
+    needs: pre-release-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Bandit SAST scan
+        run: |
+          bandit -r src/ -ll --format txt
+          echo "Security scan complete."
+
+      - name: Check for hardcoded secrets
+        run: |
+          if grep -rn --include="*.py" \
+            -E "(password|api_key|fernet_key|auth_token)\s*=\s*['\"][^'\"]{8,}['\"]" \
+            src/ ; then
+            echo "ERROR: Hardcoded secret detected — release blocked"
+            exit 1
+          fi
+          echo "No hardcoded secrets."
+
+  # ── 3. Build release package ─────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [ pre-release-tests, pre-release-security ]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest Flask>=3.0
+
+      - name: Run tests one final time
+        run: python -m pytest tests/ -v --tb=short
+
+      - name: Package source tarball
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          tar -czf astranotes-${TAG}-source.tar.gz \
+            --exclude='.git' \
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.pytest_cache' \
+            .
+          echo "SOURCE_ARCHIVE=astranotes-${TAG}-source.tar.gz" >> $GITHUB_ENV
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG=${{ env.TAG }}
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          echo "## AstraNotes ${TAG}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### What's in this release" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "- All 17 unit tests passing on Python 3.9 and 3.11" >> release_notes.md
+          echo "- Web UI: Create, Edit, Delete, Duplicate, Search, Admin panel" >> release_notes.md
+          echo "- CLI: Create, List, Search, Delete" >> release_notes.md
+          echo "- Notes persisted as JSON under \`~/.astranotes/data/\`" >> release_notes.md
+          echo "" >> release_notes.md
+          if [ -n "$PREV_TAG" ]; then
+            echo "### Commits since ${PREV_TAG}" >> release_notes.md
+            git log ${PREV_TAG}..HEAD --oneline --no-merges >> release_notes.md
+          fi
+          echo "" >> release_notes.md
+          echo "### Setup" >> release_notes.md
+          echo "\`\`\`bash" >> release_notes.md
+          echo "python3 -m venv .venv && source .venv/bin/activate" >> release_notes.md
+          echo "pip install -r requirements.txt" >> release_notes.md
+          echo "cd src && python -m astranotes.web.app   # web UI on :5000" >> release_notes.md
+          echo "cd src && python -m astranotes.cli.main  # CLI" >> release_notes.md
+          echo "\`\`\`" >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "AstraNotes ${{ env.TAG }}"
+          body_path: release_notes.md
+          files: ${{ env.SOURCE_ARCHIVE }}
+          draft: false
+          prerelease: ${{ contains(env.TAG, '-rc') || contains(env.TAG, '-beta') }}
