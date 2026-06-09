@@ -17,7 +17,6 @@ Notes are stored as individual JSON files on the local machine. There is no netw
 - **PST/PDT timestamps** — all displayed times converted from UTC
 - **Per-user data isolation** — each user's notes stored in a separate directory under `~/.astranotes/data/{user_id}/`
 - **Persistence** across sessions — every note is a JSON file; no database required (FR-05)
-- **CLI interface** — original terminal menu also available
 
 ## Architecture
 
@@ -52,7 +51,7 @@ pip install -r requirements.txt
 ## Running the web app
 
 ```bash
-python src/astranotes/web/app.py
+python3 src/astranotes/web/app.py
 ```
 
 Open `http://localhost:5000` in your browser. Click **Register** to create an account and get started.
@@ -60,7 +59,7 @@ Open `http://localhost:5000` in your browser. Click **Register** to create an ac
 ## Running the tests
 
 ```bash
-python -m pytest tests/ -v
+python3 -m pytest tests/ -v
 ```
 
 All 17 tests should pass. Tests use temporary directories and never touch the real `~/.astranotes/data/` store.
@@ -68,7 +67,7 @@ All 17 tests should pass. Tests use temporary directories and never touch the re
 To run with coverage:
 
 ```bash
-python -m pytest tests/ -v --cov=src/astranotes --cov-report=term-missing --cov-config=.coveragerc
+python3 -m pytest tests/ -v --cov=src/astranotes --cov-report=term-missing --cov-config=.coveragerc
 ```
 
 ## CI/CD
