@@ -13,7 +13,6 @@ Each user gets an isolated notes directory:
   ~/.astranotes/data/{user_id}/
 """
 import logging
-import os
 import sys
 from datetime import timezone, timedelta
 from functools import wraps
@@ -75,35 +74,6 @@ app.jinja_env.filters["pst"] = _to_pst
 user_repo = UserRepository(USERS_DIR)
 
 
-# ── Seed admin singleton ───────────────────────────────────────────
-def _seed_admin() -> None:
-    """Ensure exactly one admin account exists on every startup.
-
-    Credentials come from env vars so nothing sensitive lives in source.
-    If the account already exists it is left untouched (true singleton).
-
-    Defaults (fine for demo / local dev):
-        username: admin
-        password: admin
-
-    Override for a real deployment:
-        ASTRANOTES_ADMIN_USER=alex ASTRANOTES_ADMIN_PASS=s3cure flask run
-    """
-    admin_user = os.environ.get("ASTRANOTES_ADMIN_USER", "admin")
-    admin_pass = os.environ.get("ASTRANOTES_ADMIN_PASS", "admin")
-    if not user_repo.username_exists(admin_user):
-        user = User(
-            username=admin_user,
-            password_hash=generate_password_hash(admin_pass, method="pbkdf2:sha256"),
-            role="admin",
-        )
-        user_repo.save(user)
-        logger.info("SEED_ADMIN created singleton admin user=%r", admin_user)
-    else:
-        logger.debug("SEED_ADMIN admin user=%r already exists, skipping", admin_user)
-
-
-_seed_admin()
 
 
 # ── Helpers ────────────────────────────────────────────────────────

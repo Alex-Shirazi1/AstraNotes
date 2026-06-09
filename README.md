@@ -55,20 +55,7 @@ pip install -r requirements.txt
 python src/astranotes/web/app.py
 ```
 
-Open `http://localhost:5000` in your browser. An admin account is seeded automatically on first launch using the `ASTRANOTES_ADMIN_USER` and `ASTRANOTES_ADMIN_PASS` environment variables. To use custom credentials:
-
-```bash
-ASTRANOTES_ADMIN_USER=alex ASTRANOTES_ADMIN_PASS=s3cure python src/astranotes/web/app.py
-```
-
-To register additional users, click **Register** on the login page.
-
-## Running the CLI
-
-```bash
-cd src
-python -m astranotes.cli.main
-```
+Open `http://localhost:5000` in your browser. Click **Register** to create an account and get started.
 
 ## Running the tests
 
